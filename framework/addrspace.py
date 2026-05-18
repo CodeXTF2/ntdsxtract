@@ -35,11 +35,11 @@ import struct
 class FileAddressSpace:
     def __init__(self, fname, mode='rb', fast=False):
         self.fname = fname
-	self.name = fname
-	self.fhandle = open(fname, mode)
+        self.name = fname
+        self.fhandle = open(fname, mode)
         self.fsize = os.path.getsize(fname)
 
-	if fast == True:
+        if fast == True:
             self.fast_fhandle = open(fname, mode)
 
     def fread(self,len):
@@ -80,40 +80,40 @@ class HiveFileAddressSpace:
 
     def read(self, vaddr, length, zero=False):
         first_block = BLOCK_SIZE - vaddr % BLOCK_SIZE
-        full_blocks = ((length + (vaddr % BLOCK_SIZE)) / BLOCK_SIZE) - 1
+        full_blocks = ((length + (vaddr % BLOCK_SIZE)) // BLOCK_SIZE) - 1
         left_over = (length + vaddr) % BLOCK_SIZE
         
         paddr = self.vtop(vaddr)
         if paddr == None and zero:
             if length < first_block:
-                return "\0" * length
+                return b"\0" * length
             else:
-                stuff_read = "\0" * first_block
+                stuff_read = b"\0" * first_block
         elif paddr == None:
             return None
         else:
             if length < first_block:
                 stuff_read = self.base.read(paddr, length)
                 if not stuff_read and zero:
-                    return "\0" * length
+                    return b"\0" * length
                 else:
                     return stuff_read
 
             stuff_read = self.base.read(paddr, first_block)
             if not stuff_read and zero:
-                stuff_read = "\0" * first_block
+                stuff_read = b"\0" * first_block
 
         new_vaddr = vaddr + first_block
         for i in range(0,full_blocks):
             paddr = self.vtop(new_vaddr)
             if paddr == None and zero:
-                stuff_read = stuff_read + "\0" * BLOCK_SIZE
+                stuff_read = stuff_read + b"\0" * BLOCK_SIZE
             elif paddr == None:
                 return None
             else:
                 new_stuff = self.base.read(paddr, BLOCK_SIZE)
                 if not new_stuff and zero:
-                    new_stuff = "\0" * BLOCK_SIZE
+                    new_stuff = b"\0" * BLOCK_SIZE
                 elif not new_stuff:
                     return None
                 else:
@@ -123,7 +123,7 @@ class HiveFileAddressSpace:
         if left_over > 0:
             paddr = self.vtop(new_vaddr)
             if paddr == None and zero:
-                stuff_read = stuff_read + "\0" * left_over
+                stuff_read = stuff_read + b"\0" * left_over
             elif paddr == None:
                 return None
             else:

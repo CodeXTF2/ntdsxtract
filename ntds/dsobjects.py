@@ -28,6 +28,7 @@ from ntds.dsencryption import *
 from ntds.lib.guid import *
 from ntds.lib.sid import *
 from ntds.lib.dump import *
+from ntds.lib.compat import byte_value, hexstr
 
 class dsObject:
     '''
@@ -101,7 +102,7 @@ class dsObject:
         ancestorlist = []
         ancestorvalue = self.Record[ntds.dsfielddictionary.dsAncestorsIndex] 
         if ancestorvalue != "":
-            l = len(ancestorvalue) / 8
+            l = len(ancestorvalue) // 8
             for aid in range(0, l):
                 (ancestorid,) = unpack('I', unhexlify(ancestorvalue[aid * 8:aid * 8 + 8]))
                 ancestor = dsObject(dsDatabase, ancestorid)
@@ -211,15 +212,15 @@ class dsAccount(dsObject):
         nthash = ""
         enclmhash = unhexlify(self.Record[ntds.dsfielddictionary.dsLMHashIndex][16:])
         encnthash = unhexlify(self.Record[ntds.dsfielddictionary.dsNTHashIndex][16:])
-        if enclmhash != '':
+        if enclmhash != b'':
             lmhash = dsDecryptWithPEK(ntds.dsfielddictionary.dsPEK, enclmhash)
-            lmhash = hexlify(dsDecryptSingleHash(self.SID.RID, lmhash))
-            if lmhash == '':
+            lmhash = hexstr(dsDecryptSingleHash(self.SID.RID, lmhash))
+            if lmhash == "":
                 lmhash = "NO PASSWORD"
-        if encnthash != '':
+        if encnthash != b'':
             nthash = dsDecryptWithPEK(ntds.dsfielddictionary.dsPEK, encnthash)
-            nthash = hexlify(dsDecryptSingleHash(self.SID.RID, nthash))
-            if nthash == '':
+            nthash = hexstr(dsDecryptSingleHash(self.SID.RID, nthash))
+            if nthash == "":
                 nthash = "NO PASSWORD"
         return (lmhash, nthash)
     
@@ -230,20 +231,20 @@ class dsAccount(dsObject):
         encnthistory = unhexlify(self.Record[ntds.dsfielddictionary.dsNTHashHistoryIndex][16:])
         slmhistory = dsDecryptWithPEK(ntds.dsfielddictionary.dsPEK, enclmhistory)
         snthistory = dsDecryptWithPEK(ntds.dsfielddictionary.dsPEK, encnthistory)
-        if slmhistory != "":
-            for hindex in range(0,len(slmhistory)/16):
+        if slmhistory != b"":
+            for hindex in range(0,len(slmhistory)//16):
                 lmhash   = dsDecryptSingleHash(self.SID.RID, slmhistory[hindex*16:(hindex+1)*16])
-                if lmhash == '':
+                if lmhash == b'':
                     lmhistory.append('NO PASSWORD')
                 else:
-                    lmhistory.append(hexlify(lmhash))
-        if snthistory != "":
-            for hindex in range(0,len(snthistory)/16):
+                    lmhistory.append(hexstr(lmhash))
+        if snthistory != b"":
+            for hindex in range(0,len(snthistory)//16):
                 nthash = dsDecryptSingleHash(self.SID.RID, snthistory[hindex*16:(hindex+1)*16])
-                if nthash == '':
+                if nthash == b'':
                     nthistory.append('NO PASSWORD')
                 else:
-                    nthistory.append(hexlify(nthash))
+                    nthistory.append(hexstr(nthash))
         return (lmhistory, nthistory)
     
     def getSupplementalCredentials(self):
@@ -477,19 +478,19 @@ class dsKerberosNewKeys:
         self.OlderCredentials = []
         
     def Print(self, indent=""):
-        print "{0}salt: {1}".format(indent, self.DefaultSalt)
+        print("{0}salt: {1}".format(indent, self.DefaultSalt))
         if len(self.Credentials) > 0:
-            print "{0}Credentials".format(indent)
+            print("{0}Credentials".format(indent))
             for key in self.Credentials:
-                print "{0}  {1} {2}".format(indent, key.KeyType, hexlify(key.Key))
+                print("{0}  {1} {2}".format(indent, key.KeyType, hexstr(key.Key)))
         if len(self.OldCredentials) > 0:
-            print "{0}OldCredentials".format(indent)
+            print("{0}OldCredentials".format(indent))
             for key in self.OldCredentials:
-                print "{0}  {1} {2}".format(indent, key.KeyType, hexlify(key.Key))
+                print("{0}  {1} {2}".format(indent, key.KeyType, hexstr(key.Key)))
         if len(self.OlderCredentials) > 0:
-            print "{0}OlderCredentials".format(indent)
+            print("{0}OlderCredentials".format(indent))
             for key in self.OlderCredentials:
-                print "{0}  {1} {2}".format(indent, key.KeyType, hexlify(key.Key))
+                print("{0}  {1} {2}".format(indent, key.KeyType, hexstr(key.Key)))
 
 class dsSupplCredentials:
     '''
@@ -507,23 +508,23 @@ class dsSupplCredentials:
     
     def Print(self, indent=""):
         if self.KerberosNewerKeys != None:
-            print "{0}Kerberos newer keys".format(indent)
+            print("{0}Kerberos newer keys".format(indent))
             self.KerberosNewerKeys.Print(indent + "  ")
         if self.KerberosKeys != None:
-            print "{0}Kerberos keys".format(indent)
+            print("{0}Kerberos keys".format(indent))
             self.KerberosKeys.Print(indent + "  ")
         if self.WDigestHashes != None:
-            print "{0}WDigest hashes".format(indent)
+            print("{0}WDigest hashes".format(indent))
             for h in self.WDigestHashes:
-                print "{0}  {1}".format(indent, hexlify(h))
+                print("{0}  {1}".format(indent, hexstr(h)))
         if self.Packages != None:
-            print "{0}Packages".format(indent)
+            print("{0}Packages".format(indent))
             for p in self.Packages:
-                print "{0}  {1}".format(indent, p)
+                print("{0}  {1}".format(indent, p))
         if self.Password != None:
-            print "{0}Password: {1}".format(indent, self.Password)
-        print "Debug: "
-        print dump(self.Text,16,16)
+            print("{0}Password: {1}".format(indent, self.Password))
+        print("Debug: ")
+        print(dump(self.Text,16,16))
     
     def ParseUserProperties(self, text):
         offset = 0
@@ -573,7 +574,7 @@ class dsSupplCredentials:
         for i in range(PropertyCount):
             offset = self.ParseUserProperty(text, offset)
         assert offset == len(text) - 1
-        reserved5 = ord(text[offset:offset+1])
+        reserved5 = byte_value(text[offset:offset+1])
         # must be 0 according to documentation, but in practice contains arbitrary value
         #assert reserved5 == 0
   
@@ -599,35 +600,35 @@ class dsSupplCredentials:
         offset += NameLength
         if len(text[offset:offset+ValueLength]) != ValueLength:
             return
-        if Name == u"Primary:Kerberos-Newer-Keys":
+        if Name == "Primary:Kerberos-Newer-Keys":
             self.KerberosNewerKeys = self.ParseKerberosNewerKeysPropertyValue(unhexlify(text[offset:offset+ValueLength]))
-        elif Name == u"Primary:Kerberos":
+        elif Name == "Primary:Kerberos":
             self.KerberosKeys = self.ParseKerberosPropertyValue(unhexlify(text[offset:offset+ValueLength]))
-        elif Name == u"Primary:WDigest":
+        elif Name == "Primary:WDigest":
             self.WDigestHashes = self.ParseWDigestPropertyValue(unhexlify(text[offset:offset+ValueLength]))
-        elif Name == u"Packages":
+        elif Name == "Packages":
             self.Packages = unhexlify(text[offset:offset+ValueLength]).decode('utf-16').split("\x00")
-        elif Name == u"Primary:CLEARTEXT":
+        elif Name == "Primary:CLEARTEXT":
             try:
-                self.Password = unicode(unhexlify(text[offset:offset+ValueLength]).decode('utf-16')).encode('utf8')
+                self.Password = unhexlify(text[offset:offset+ValueLength]).decode('utf-16')
             except:
                 self.Password = dump(unhexlify(text[offset:offset+ValueLength]),16,16)
         else:
-            print Name
+            print(Name)
         return offset + ValueLength
 
     def ParseWDigestPropertyValue(self, text):
         try:
             offset = 0
-            Reserved1 = ord(text[offset:offset+1])
+            Reserved1 = byte_value(text[offset:offset+1])
             offset += 1
-            Reserved2 = ord(text[offset:offset+1])
+            Reserved2 = byte_value(text[offset:offset+1])
             assert Reserved2 == 0
             offset += 1
-            Version = ord(text[offset:offset+1])
+            Version = byte_value(text[offset:offset+1])
             assert Version == 1
             offset += 1
-            NumberOfHashes = ord(text[offset:offset+1])
+            NumberOfHashes = byte_value(text[offset:offset+1])
             assert NumberOfHashes == 29
             offset += 1
             for i in range(3):

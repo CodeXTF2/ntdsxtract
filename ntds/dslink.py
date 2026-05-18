@@ -21,7 +21,7 @@
 import ntds.dsfielddictionary
 from ntds.dstime import *
 import sys
-from lib.map import *
+from .lib.map import *
 import pickle
 from os import path
 
@@ -29,13 +29,14 @@ dsMapLinks         = {}
 dsMapBackwardLinks = {}
 
 def dsInitLinks(dsESEFile, workdir):
-    dl = open(dsESEFile , 'rb', 0)
+    dl = open(dsESEFile, 'r', encoding='utf-8-sig', errors='replace', newline='')
     dl.seek(0)
     line = dl.readline()
     if line == "":
         sys.stderr.write("[-] Warning! Error processing the first line!\n")
         sys.exit(1)
     else:
+        line = line.rstrip("\r\n")
         ntds.dsfielddictionary.dsFieldNameRecord = line.split('\t')
         record = line.split('\t')
         for cid in range(0, len(record)-1):
@@ -78,6 +79,7 @@ def dsBuildLinkMaps(dsLinks, workdir):
         line = dsLinks.readline()
         if line == "":
             break
+        line = line.rstrip("\r\n")
         record = line.split('\t')
         if lineid != 0:
             source = int(record[ntds.dsfielddictionary.dsSourceRecordIdIndex])

@@ -24,6 +24,7 @@ from framework.addrspace import HiveFileAddressSpace
 from Crypto.Hash import MD5
 from Crypto.Cipher import ARC4,DES
 from struct import unpack,pack
+from binascii import unhexlify, hexlify
 
 odd_parity = [
   1, 1, 2, 2, 4, 4, 7, 7, 8, 8, 11, 11, 13, 13, 14, 14,
@@ -49,40 +50,41 @@ p = [ 0x8, 0x5, 0x4, 0x2, 0xb, 0x9, 0xd, 0x3,
       0x0, 0x6, 0x1, 0xc, 0xe, 0xa, 0xf, 0x7 ]
 
 # Constants for SAM decrypt algorithm
-aqwerty = "!@#$%^&*()qwertyUIOPAzxcvbnmQQQQQQQQQQQQ)(*@&%\0"
-anum = "0123456789012345678901234567890123456789\0"
-antpassword = "NTPASSWORD\0"
-almpassword = "LMPASSWORD\0"
+aqwerty = b"!@#$%^&*()qwertyUIOPAzxcvbnmQQQQQQQQQQQQ)(*@&%\0"
+anum = b"0123456789012345678901234567890123456789\0"
+antpassword = b"NTPASSWORD\0"
+almpassword = b"LMPASSWORD\0"
 
-empty_lm = "aad3b435b51404eeaad3b435b51404ee".decode('hex')
-empty_nt = "31d6cfe0d16ae931b73c59d7e0c089c0".decode('hex')
+empty_lm = unhexlify("aad3b435b51404eeaad3b435b51404ee")
+empty_nt = unhexlify("31d6cfe0d16ae931b73c59d7e0c089c0")
 
 def str_to_key(s):
     key = []
-    key.append( ord(s[0])>>1 )
-    key.append( ((ord(s[0])&0x01)<<6) | (ord(s[1])>>2) )
-    key.append( ((ord(s[1])&0x03)<<5) | (ord(s[2])>>3) )
-    key.append( ((ord(s[2])&0x07)<<4) | (ord(s[3])>>4) )
-    key.append( ((ord(s[3])&0x0F)<<3) | (ord(s[4])>>5) )
-    key.append( ((ord(s[4])&0x1F)<<2) | (ord(s[5])>>6) )
-    key.append( ((ord(s[5])&0x3F)<<1) | (ord(s[6])>>7) )
-    key.append( ord(s[6])&0x7F )
+    key.append( s[0]>>1 )
+    key.append( ((s[0]&0x01)<<6) | (s[1]>>2) )
+    key.append( ((s[1]&0x03)<<5) | (s[2]>>3) )
+    key.append( ((s[2]&0x07)<<4) | (s[3]>>4) )
+    key.append( ((s[3]&0x0F)<<3) | (s[4]>>5) )
+    key.append( ((s[4]&0x1F)<<2) | (s[5]>>6) )
+    key.append( ((s[5]&0x3F)<<1) | (s[6]>>7) )
+    key.append( s[6]&0x7F )
     for i in range(8):
         key[i] = (key[i]<<1)
         key[i] = odd_parity[key[i]]
-    return "".join(chr(k) for k in key)
+    return bytes(key)
 
 def sid_to_key(sid):
-    s1 = ""
-    s1 += chr(sid & 0xFF)
-    s1 += chr((sid>>8) & 0xFF)
-    s1 += chr((sid>>16) & 0xFF)
-    s1 += chr((sid>>24) & 0xFF)
-    s1 += s1[0];
-    s1 += s1[1];
-    s1 += s1[2];
-    s2 = s1[3] + s1[0] + s1[1] + s1[2]
-    s2 += s2[0] + s2[1] + s2[2]
+    s1 = bytes([
+        sid & 0xFF,
+        (sid>>8) & 0xFF,
+        (sid>>16) & 0xFF,
+        (sid>>24) & 0xFF,
+    ])
+    s1 += s1[0:1]
+    s1 += s1[1:2]
+    s1 += s1[2:3]
+    s2 = s1[3:4] + s1[0:1] + s1[1:2] + s1[2:3]
+    s2 += s2[0:1] + s2[1:2] + s2[2:3]
 
     return str_to_key(s1),str_to_key(s2)
     
@@ -109,16 +111,14 @@ def get_bootkey(sysaddr):
     lsa = open_key(root, lsa_base)
     if not lsa: return None
 
-    bootkey = ""
+    bootkey = b""
     
     for lk in lsa_keys:
         key = open_key(lsa, [lk])
         class_data = sysaddr.read(key.Class.value, key.ClassLength.value)
-        bootkey += class_data.decode('utf-16-le').decode('hex')
+        bootkey += unhexlify(class_data.decode('utf-16-le'))
     
-    bootkey_scrambled = ""
-    for i in range(len(bootkey)):
-        bootkey_scrambled += bootkey[p[i]]
+    bootkey_scrambled = bytes(bootkey[p[i]] for i in range(len(bootkey)))
     
     return bootkey_scrambled
 
@@ -205,11 +205,11 @@ def get_user_hashes(user_key, hbootkey):
         enc_nt_hash = V[nt_hash_offset:nt_hash_offset+0x10]
     elif hash_offset + 0x14 < len(V):
         nt_hash_offset = hash_offset + 8
-        enc_lm_hash = ""
+        enc_lm_hash = b""
         enc_nt_hash = V[nt_hash_offset:nt_hash_offset+0x10]
     else:
-        enc_lm_hash = ""
-        enc_nt_hash = ""
+        enc_lm_hash = b""
+        enc_nt_hash = b""
     
     return decrypt_hashes(rid, enc_lm_hash, enc_nt_hash, hbootkey)
 
@@ -235,8 +235,8 @@ def dump_hashes(sysaddr, samaddr):
         lmhash,nthash = get_user_hashes(user,hbootkey)
         if not lmhash: lmhash = empty_lm
         if not nthash: nthash = empty_nt
-        print "%s:%d:%s:%s:::" % (get_user_name(user), int(user.Name,16),
-                            lmhash.encode('hex'), nthash.encode('hex'))
+        print("%s:%d:%s:%s:::" % (get_user_name(user), int(user.Name,16),
+                            hexlify(lmhash).decode("ascii"), hexlify(nthash).decode("ascii")))
 
 def dump_file_hashes(syshive_fname, samhive_fname):
     sysaddr = HiveFileAddressSpace(syshive_fname)

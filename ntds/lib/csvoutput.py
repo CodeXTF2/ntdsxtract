@@ -26,7 +26,7 @@ cf = None
 
 def init_csv(file):
     global cf, cw
-    cf = open(file, "w")
+    cf = open(file, "w", newline="")
     cw = csv.writer(cf, delimiter=";", quoting=csv.QUOTE_ALL)
     
 def write_csv(record):

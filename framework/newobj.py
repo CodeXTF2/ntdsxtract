@@ -111,14 +111,16 @@ class Obj(object):
             return Obj(other, self.address, self.space)
         else:
             raise ValueError("Must provide a type name as string for casting")
+
+    __truediv__ = __div__
     
     def members(self):
         """Return a list of this object's members, sorted by offset."""
 
         # Could also just return the list
-        membs = [ (k, v[0]) for k,v in types[self.name][1].items()]
+        membs = [ (k, v[0]) for k,v in list(types[self.name][1].items())]
         membs.sort(key=itemgetter(1))
-        return map(itemgetter(0),membs) + self.extra_members
+        return list(map(itemgetter(0),membs)) + self.extra_members
 
     def values(self):
         """Return a dictionary of this object's members and their values"""
@@ -257,7 +259,7 @@ class _CM_KEY_NODE(Obj):
 
     def getName(self):
         return read_string(self.space, types, ['_CM_KEY_NODE', 'Name'],
-            self.address, self.NameLength.value)
+            self.address, self.NameLength.value).decode('latin-1')
     Name = property(fget=getName)
 
 class _CM_KEY_VALUE(Obj):
@@ -267,7 +269,7 @@ class _CM_KEY_VALUE(Obj):
 
     def getName(self):
         return read_string(self.space, types, ['_CM_KEY_VALUE', 'Name'],
-            self.address, self.NameLength.value)
+            self.address, self.NameLength.value).decode('latin-1')
     Name = property(fget=getName)
 
 class _CHILD_LIST(Obj):

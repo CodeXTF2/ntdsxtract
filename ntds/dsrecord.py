@@ -32,6 +32,7 @@ def dsGetRecordByLineId(dsDatabase, dsLineId):
     if line == "":
         return None
     else:
+        line = line.rstrip("\r\n")
         record = line.split('\t')
         return record
 

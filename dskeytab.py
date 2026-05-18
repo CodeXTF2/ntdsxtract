@@ -103,7 +103,7 @@ def dsReadNtdsMachineDNName():
                 # not implemented
                 return None
             data = v.space.read(v.Data.value, v.DataLength.value)
-            return data.decode('utf-16').strip(u'\x00')
+            return data.decode('utf-16').strip('\x00')
     return None
     
 def dsGetMachineDomain():
@@ -119,7 +119,7 @@ def dsGetMachineDomain():
         if not parts[i].lower().startswith("dc="):
             return None
         parts[i] = parts[i][3:]
-    return ".".join(parts).encode('ascii')
+    return ".".join(parts)
 
 def dsAddPrincipalEntries(principal, keytabFile):
     '''
@@ -181,7 +181,7 @@ def dsPrincipalKeytabFromSupplementalCredentials(kerberosKeys, realm, SAMAccount
     OlderCredentials) each time using the same password, following password updates
     does not change the structure. The structure remains the same (binary identical).
     For experiments I've used the following command
-    ktpass /princ host/user1.universe.test@UNIVERSE.TEST /mapuser user1 /out \temp\user1.keytab /crypto all /ptype KRB5_NT_PRINCIPAL /pass 1
+    ktpass /princ host/user1.universe.test@UNIVERSE.TEST /mapuser user1 /out \temp\\user1.keytab /crypto all /ptype KRB5_NT_PRINCIPAL /pass 1
     Each run of this command update the password, outputs new key version number.
     Wireshark capture confirms that kvn really changes.
     It's logical to expect that kvn is stored in attributes of the corresponding
@@ -221,6 +221,12 @@ def dsPackKeytabEntry(realm, SAMAccountName, nameType, timestamp, keyVersionNumb
     # decrypt when type is -140.
     if keyType == -140:
         keyType = 23
+    if isinstance(realm, str):
+        realm = realm.encode("ascii")
+    if isinstance(SAMAccountName, str):
+        SAMAccountName = SAMAccountName.encode("utf-8")
+    if isinstance(key, str):
+        key = key.encode("ascii")
     s = struct.pack(">HH", 1, len(realm))
     s += realm
     s += struct.pack(">H", len(SAMAccountName))
@@ -250,7 +256,7 @@ if defaultRealm == None:
 #print "default realm:", defaultRealm, type(defaultRealm)
 
 with open(keytabFilePath, 'wb') as keytabFile:
-    keytabFile.write("\x05\x02")
+    keytabFile.write(b"\x05\x02")
     for recordid in dsMapLineIdByRecordId:
         recordtype = int(dsGetRecordType(db, recordid))
         if recordtype == utype:
